@@ -1,106 +1,127 @@
+import csv
 import streamlit as st
 
-careers = {
-    "People & Care": [
-        {"title": "Medical Assistant",
-         "what": "Helps doctors with patients: vitals, scheduling, records.",
-         "pay": "$40k–$50k",
-         "start": "6–12 month certificate program"},
-        {"title": "Social Worker",
-         "what": "Connects people and families with support and resources.",
-         "pay": "$50k–$65k",
-         "start": "Bachelor's in social work (BSW)"},
-    ],
-    "Business & Money": [
-        {"title": "Real Estate Agent",
-         "what": "Helps people buy, sell, and rent homes.",
-         "pay": "$40k–$100k+ (commission)",
-         "start": "State license course and exam"},
-        {"title": "Bookkeeper",
-         "what": "Tracks a business's money coming in and going out.",
-         "pay": "$40k–$55k",
-         "start": "Certificate or on-the-job training"},
-    ],
-    "Tech & Data": [
-        {"title": "IT Support Specialist",
-         "what": "Fixes computer and network problems for people.",
-         "pay": "$45k–$65k",
-         "start": "CompTIA A+ certification"},
-        {"title": "Data Analyst",
-         "what": "Turns data into answers that help businesses decide.",
-         "pay": "$65k–$100k",
-         "start": "Learn Excel, SQL, and Python"},
-    ],
-    "Creative": [
-        {"title": "Graphic Designer",
-         "what": "Creates logos, ads, and social media visuals.",
-         "pay": "$45k–$70k",
-         "start": "Build a portfolio; learn Canva or Adobe"},
-        {"title": "Video Editor",
-         "what": "Cuts and polishes videos for creators and brands.",
-         "pay": "$45k–$75k",
-         "start": "Learn Premiere or CapCut; post your work"},
-    ],
-    "Hands-On & Trades": [
-        {"title": "Electrician",
-         "what": "Installs and repairs wiring in homes and buildings.",
-         "pay": "$50k–$90k",
-         "start": "Paid apprenticeship"},
-        {"title": "HVAC Technician",
-         "what": "Installs and fixes heating and cooling systems.",
-         "pay": "$45k–$70k",
-         "start": "Trade school or apprenticeship"},
-    ],
-}
+st.set_page_config(page_title="Off the List")
 
-questions = [
-    ["Do you like helping or taking care of people?", ["People & Care"]],
-    ["Do you enjoy working with numbers or money?", ["Business & Money", "Tech & Data"]],
-    ["Do you like drawing, writing, or making videos?", ["Creative"]],
-    ["Do you like fixing or building things with your hands?", ["Hands-On & Trades"]],
-    ["Would you enjoy convincing people or making deals?", ["Business & Money"]],
-    ["Do you like solving puzzles or figuring out how things work?", ["Tech & Data"]],
-    ["Do you prefer being active over sitting at a desk all day?", ["Hands-On & Trades", "People & Care"]],
-    ["Do you like coming up with new ideas?", ["Creative", "Business & Money"]],
-]
-
-st.title("Career Finder")
-st.write("Answer each question to see which careers fit you.")
-
-answers = []
-for i in range(len(questions)):
-    choice = st.radio(questions[i][0], ["Yes", "Maybe", "No"],
-                      index=None, horizontal=True, key=i)
-    answers.append(choice)
-
-if st.button("See my results"):
-    if None in answers:
-        st.warning("Answer every question first!")
-    else:
-        scores = {"People & Care": 0, "Business & Money": 0, "Tech & Data": 0,
-                  "Creative": 0, "Hands-On & Trades": 0}
-        points_for = {"Yes": 2, "Maybe": 1, "No": 0}
-
-        for i in range(len(questions)):
-            points = points_for[answers[i]]
-            for c in questions[i][1]:
-                scores[c] += points
-
-        ranked = sorted(scores, key=scores.get, reverse=True)
-        cutoff = scores[ranked[1]]
-        top = []
-        for cat in ranked:
-            if scores[cat] >= cutoff and scores[cat] > 0:
-                top.append(cat)
-
-        if len(top) == 0:
-            st.info("No matches yet. Try answering yes to a few!")
+# ---------- Load careers from the spreadsheet ----------
+careers = []
+with open("careers.csv", encoding="utf-8") as f:
+    for row in csv.DictReader(f):
+        if row["tags"] == "":
+            row["tags"] = []
         else:
-            for i, cat in enumerate(top):
-                st.header("Match #" + str(i + 1) + ": " + cat +
-                          " (" + str(scores[cat]) + " points)")
-                for job in careers[cat]:
-                    st.subheader(job["title"])
-                    st.write("**What you do:**", job["what"])
-                    st.write("**Pay:**", job["pay"])
-                    st.write("**How to start:**", job["start"])
+            row["tags"] = row["tags"].split(";")
+        row["keywords"] = row["keywords"].split(";")
+        careers.append(row)
+
+# Education levels, lowest to highest
+career_levels = {
+    "No diploma required": 0,
+    "High school diploma or GED": 1,
+    "Certificate (under 2 years)": 2,
+    "Associate degree": 3,
+    "Bachelor's degree": 4,
+    "Master's degree": 5,
+}
+my_levels = {
+    "Still in school": 0,
+    "No diploma yet": 0,
+    "GED or high school diploma": 1,
+    "Certificate or trade program": 2,
+    "Associate degree": 3,
+    "Bachelor's degree": 4,
+    "Master's or higher": 5,
+}
+all_needs = ["No degree required", "Paid training", "Remote-friendly",
+             "Active work", "Start in under 2 years"]
+
+# ---------- Home ----------
+st.title("Off the List")
+st.caption("CAREER DISCOVERY · Explore careers first. Job hunting comes later.")
+st.write("Tell us who you are. We'll suggest paths that fit, explain why, and show how to start.")
+
+text = st.text_area("1. Tell us about you",
+                    placeholder="I love fixing things, I like being outside, and I want to help my community...")
+my_ed = st.selectbox("2. What's your education so far?", list(my_levels),
+                     index=None, placeholder="Choose one")
+needs = st.multiselect("3. What do you need? (optional)", all_needs)
+
+# ---------- Results ----------
+if st.button("Find my careers →", type="primary"):
+    typed = text.lower()
+
+    # Count keyword matches for each area
+    area_hits = {}
+    for c in careers:
+        area = c["area"]
+        if area not in area_hits:
+            hits = []
+            for word in c["keywords"]:
+                if word in typed:
+                    hits.append(word)
+            area_hits[area] = hits
+
+    ranked = sorted(area_hits, key=lambda a: len(area_hits[a]), reverse=True)
+    top = []
+    for area in ranked:
+        if len(area_hits[area]) > 0 and len(top) < 2:
+            top.append(area)
+
+    if len(top) == 0:
+        st.warning("Write a little more about what you like, like fixing things, helping people, or being outside.")
+    else:
+        st.header("Career paths worth exploring")
+        st.caption("These are paths to explore, not job openings.")
+
+        for i, area in enumerate(top):
+            st.subheader("Match #" + str(i + 1) + ": " + area)
+            st.write("Because you mentioned: " + ", ".join(area_hits[area]))
+
+            # Score each career in this area
+            area_careers = []
+            for c in careers:
+                if c["area"] == area:
+                    met = []
+                    for need in needs:
+                        if need in c["tags"]:
+                            met.append(need)
+                    can_start = False
+                    if my_ed is not None:
+                        can_start = career_levels[c["education_needed"]] <= my_levels[my_ed]
+                    c["met"] = met
+                    c["can_start"] = can_start
+                    c["score"] = len(met)
+                    if can_start:
+                        c["score"] = c["score"] + 10
+                    area_careers.append(c)
+
+            area_careers.sort(key=lambda c: c["score"], reverse=True)
+
+            for c in area_careers:
+                with st.container(border=True):
+                    st.markdown("#### " + c["title"])
+                    st.write(c["one_liner"])
+
+                    if c["median_pay"].startswith("[CHECK]"):
+                        st.write("**Pay:** Varies (no official number yet)")
+                    else:
+                        st.write("**Pay:**", c["median_pay"].replace("$", "\\$"), "median per year")
+
+                    if my_ed is None:
+                        st.write("**Education needed:**", c["education_needed"])
+                    elif c["can_start"]:
+                        st.markdown(":green[**✓ You can start this with what you have**]")
+                    else:
+                        st.markdown(":orange[**You'd need first:** " + c["education_needed"] + "]")
+
+                    if len(c["met"]) > 0:
+                        st.markdown(":green[✓ " + " · ".join(c["met"]) + "]")
+
+                    with st.expander("See full profile"):
+                        st.write("**A normal workday:**", c["normal_day"])
+                        st.write("**Education & training:**", c["training"])
+                        st.write("**One challenge to consider:**", c["challenge"])
+                        st.success("**Your first step:** " + c["first_step"])
+
+st.divider()
+st.caption("Pay is the U.S. median from the Bureau of Labor Statistics (May 2025). Check bls.gov/ooh for details.")
